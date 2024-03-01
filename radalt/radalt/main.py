@@ -12,11 +12,11 @@ import threading
 import ctypes
 import numpy as np
 
-SIZE = 5  # bytes after head 
+SIZE = 5  # bytes after head
 
 ## Steve says make a custom message to hold 2 named items: altitude, m (float) and SNR (UInt8)
 # create blank msg to populate instead of the zeros list + deepcopies
-# next interpret the msg as a struct (builtin package) 
+# next interpret the msg as a struct (builtin package)
 # sensor is format string '>H'
 # convert int from tuple to float through conversion to meters, stuff into msg
 
@@ -32,14 +32,14 @@ def decodePacket(packet, node):
         snr = np.uint8(packet[-2])
         if snr > 13:
             return (1, alt, snr)
-        else: 
+        else:
             error_msg = 'altimeter SNR below manufacturer-defined minimum threshold (13dB); packet dumped'
             node.get_logger().info(error_msg)
             return (0,)
     else:
         error_msg = 'decoding checksum failed; packet dumped'
         node.get_logger().info(error_msg)
-        return (0,) 
+        return (0,)
 
 
 def talker():
@@ -73,6 +73,7 @@ def talker():
                 if ret[0]:
                     msg.rad_alt = ret[1]
                     msg.snr = ret[2]
+                    msg.header.stamp = node.get_clock().now().to_msg()
                     node.get_logger().info(f'{type(ret[1])}')
                     node.get_logger().info(f'{type(ret[2])}')
                     pub.publish(msg)
@@ -83,7 +84,7 @@ def talker():
     except KeyboardInterrupt:
         pass
 
-  
+
 
 if __name__ == '__main__':
     rclpy.init()

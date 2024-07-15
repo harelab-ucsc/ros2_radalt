@@ -59,7 +59,7 @@ def talker():
 
     thread = threading.Thread(target=rclpy.spin, args=(node, ), daemon=True)
     thread.start()
-    node.get_logger().info('here')
+    # node.get_logger().info('here')
 
     try:
         while rclpy.ok():
@@ -74,6 +74,7 @@ def talker():
                     msg.rad_alt = ret[1]
                     msg.snr = ret[2]
                     msg.header.stamp = node.get_clock().now().to_msg()
+                    msg.header.frame_id = 'radalt' 
                     node.get_logger().info(f'{type(ret[1])}')
                     node.get_logger().info(f'{type(ret[2])}')
                     pub.publish(msg)

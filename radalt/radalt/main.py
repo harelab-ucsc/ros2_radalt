@@ -4,13 +4,14 @@ from rclpy.serialization import serialize_message
 import serial
 import struct
 from std_msgs.msg import UInt8, UInt16, String
-from ainsteintools.msg import AltSNR
+from custom_msgs.msg import AltSNR
 from copy import deepcopy
 import pdb
 import threading
 # ctypes is imported to create a string buffer
 import ctypes
 import numpy as np
+import builtins
 
 SIZE = 5  # bytes after head
 
@@ -43,6 +44,7 @@ def decodePacket(packet, node):
 
 
 def talker():
+    rclpy.init()
     node = rclpy.create_node('alt_pub')
     # super().__init__('alt_pub')
     pub = node.create_publisher(AltSNR, 'rad_altitude', 10)
@@ -59,36 +61,33 @@ def talker():
 
     thread = threading.Thread(target=rclpy.spin, args=(node, ), daemon=True)
     thread.start()
-    # node.get_logger().info('here')
 
+    while rclpy.ok():
+        val = device.read()  # figure out how this interacts with timeout
+        if val == b'\xfe':
+            val = device.read(SIZE)
+            packet = np.frombuffer(val, dtype=np.uint8)
+
+            ret = decodePacket(packet, node)
+            msg = AltSNR()
+            if ret[0]:
+                msg.header.stamp = node.get_clock().now().to_msg()
+                msg.header.frame_id = 'radalt'
+                msg.altitude = float(ret[1]/100)
+                msg.snr = int(ret[2])
+                pub.publish(msg)
+            # self.timer.sleep()
+            rate.sleep()
+        else:
+            pass
+    thread.join()
+
+def main():
     try:
-        while rclpy.ok():
-            val = device.read()  # figure out how this interacts with timeout
-            if val == b'\xfe':
-                val = device.read(SIZE)
-                packet = np.frombuffer(val, dtype=np.uint8)
-
-                ret = decodePacket(packet, node)
-                msg = AltSNR()
-                if ret[0]:
-                    msg.rad_alt = ret[1]
-                    msg.snr = ret[2]
-                    msg.header.stamp = node.get_clock().now().to_msg()
-                    msg.header.frame_id = 'radalt' 
-                    node.get_logger().info(f'{type(ret[1])}')
-                    node.get_logger().info(f'{type(ret[2])}')
-                    pub.publish(msg)
-                # self.timer.sleep()
-                rate.sleep()
-            else:
-                pass
+        talker()
     except KeyboardInterrupt:
         pass
 
 
-
 if __name__ == '__main__':
-    rclpy.init()
-    talker()
-    rclpy.shutdown()
-    thread.join()
+    main()

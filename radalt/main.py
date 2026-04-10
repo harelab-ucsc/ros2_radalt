@@ -52,9 +52,9 @@ def talker():
     # self.timer = self.create_timer(timer_period, self.timer_callback)
     rate = node.create_rate(100)
 
-    port = node.declare_parameter('port', '/dev/ttyUSB0').value
+    port = node.declare_parameter('port', '/dev/devRADALT').value
     # assert isinstance(port, str)
-    device = serial.Serial(port=port, baudrate=115200, timeout=0.5)
+    device = serial.Serial(port=port, baudrate=115200, timeout=1.0)
 
     blank_packet = [0 for _ in range(SIZE)]
     packet = deepcopy(blank_packet)

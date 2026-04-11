@@ -1,21 +1,13 @@
 import rclpy
-from rclpy.node import Node
-from rclpy.serialization import serialize_message
 import serial
-import struct
-from std_msgs.msg import UInt8, UInt16, String
 from custom_msgs.msg import AltSNR
 from copy import deepcopy
-import pdb
 import threading
-# ctypes is imported to create a string buffer
-import ctypes
 import numpy as np
-import builtins
 
 SIZE = 5  # bytes after head
 
-## Steve says make a custom message to hold 2 named items: altitude, m (float) and SNR (UInt8)
+# Steve says make a custom message to hold 2 named items: altitude, m (float) and SNR (UInt8)
 # create blank msg to populate instead of the zeros list + deepcopies
 # next interpret the msg as a struct (builtin package)
 # sensor is format string '>H'
@@ -34,7 +26,10 @@ def decodePacket(packet, node):
         if snr > 13:
             return (1, alt, snr)
         else:
-            error_msg = 'altimeter SNR below manufacturer-defined minimum threshold (13dB); packet dumped'
+            error_msg = (
+                'altimeter SNR below manufacturer-defined minimum '
+                'threshold (13dB); packet dumped'
+            )
             node.get_logger().info(error_msg)
             return (0,)
     else:
@@ -81,6 +76,7 @@ def talker():
         else:
             pass
     thread.join()
+
 
 def main():
     try:

@@ -1,7 +1,6 @@
 import rclpy
 import serial
 from custom_msgs.msg import AltSNR
-from copy import deepcopy
 import threading
 import numpy as np
 
@@ -43,38 +42,29 @@ def talker():
     node = rclpy.create_node('alt_pub')
     # super().__init__('alt_pub')
     pub = node.create_publisher(AltSNR, 'rad_altitude', 10)
-    # timer_period = 100  # hz
-    # self.timer = self.create_timer(timer_period, self.timer_callback)
-    rate = node.create_rate(100)
-
     port = node.declare_parameter('port', '/dev/devRADALT').value
     # assert isinstance(port, str)
     device = serial.Serial(port=port, baudrate=115200, timeout=1.0)
-
-    blank_packet = [0 for _ in range(SIZE)]
-    packet = deepcopy(blank_packet)
 
     thread = threading.Thread(target=rclpy.spin, args=(node, ), daemon=True)
     thread.start()
 
     while rclpy.ok():
-        val = device.read()  # figure out how this interacts with timeout
-        if val == b'\xfe':
-            val = device.read(SIZE)
-            packet = np.frombuffer(val, dtype=np.uint8)
+        # Block until sync byte — no busy-spin on non-header bytes
+        device.read_until(b'\xfe')
+        val = device.read(SIZE)
+        if len(val) < SIZE:
+            continue
+        packet = np.frombuffer(val, dtype=np.uint8)
 
-            ret = decodePacket(packet, node)
-            msg = AltSNR()
-            if ret[0]:
-                msg.header.stamp = node.get_clock().now().to_msg()
-                msg.header.frame_id = 'radalt'
-                msg.altitude = float(ret[1]/100)
-                msg.snr = int(ret[2])
-                pub.publish(msg)
-            # self.timer.sleep()
-            rate.sleep()
-        else:
-            pass
+        ret = decodePacket(packet, node)
+        msg = AltSNR()
+        if ret[0]:
+            msg.header.stamp = node.get_clock().now().to_msg()
+            msg.header.frame_id = 'radalt'
+            msg.altitude = float(ret[1]/100)
+            msg.snr = int(ret[2])
+            pub.publish(msg)
     thread.join()
 
 

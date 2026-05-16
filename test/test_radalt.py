@@ -1,5 +1,5 @@
 """
-Tests for radalt/main.py
+Tests for radalt/main.py.
 
 decodePacket tests are pure-Python (numpy only) — no ROS 2 runtime needed.
 Serial-loop tests mock rclpy + serial to verify that read_until() is used
@@ -117,8 +117,10 @@ class TestDecodePacket(unittest.TestCase):
 
 class TestSerialLoop(unittest.TestCase):
     """
-    Verify the refactored talker() loop uses serial.read_until() to locate
-    the sync byte instead of the old byte-by-byte busy-poll.
+    Verify the refactored talker() loop uses serial.read_until().
+
+    Checks that the sync byte is located with read_until() instead of the
+    old byte-by-byte busy-poll.
     """
 
     def _run_one_cycle(self, payload=None):
@@ -153,7 +155,7 @@ class TestSerialLoop(unittest.TestCase):
         return mock_device
 
     def test_read_until_called_with_sync_byte(self):
-        """Loop must call read_until(b'\\xfe') to locate each packet start."""
+        r"""Loop must call read_until(b'\xfe') to locate each packet start."""
         device = self._run_one_cycle()
         device.read_until.assert_called_with(b'\xfe')
 

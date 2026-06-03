@@ -143,8 +143,8 @@ class TestSerialLoop(unittest.TestCase):
             return _count[0] <= 1
 
         with patch("radalt.main.rclpy") as mock_rclpy, \
-             patch("radalt.main.serial.Serial", return_value=mock_device), \
-             patch("radalt.main.threading.Thread") as mock_thread:
+                patch("radalt.main.serial.Serial", return_value=mock_device), \
+                patch("radalt.main.threading.Thread") as mock_thread:
 
             mock_rclpy.ok.side_effect = _ok
             mock_rclpy.create_node.return_value = mock_node
@@ -176,9 +176,9 @@ class TestSerialLoop(unittest.TestCase):
     def test_short_read_skips_decode(self):
         """A truncated payload (len < SIZE) must not reach decodePacket."""
         with patch("radalt.main.rclpy") as mock_rclpy, \
-             patch("radalt.main.serial.Serial") as mock_serial_cls, \
-             patch("radalt.main.threading.Thread"), \
-             patch("radalt.main.decodePacket") as mock_decode:
+                patch("radalt.main.serial.Serial") as mock_serial_cls, \
+                patch("radalt.main.threading.Thread"), \
+                patch("radalt.main.decodePacket") as mock_decode:
 
             mock_device = MagicMock()
             mock_device.read_until.return_value = b'\xfe'

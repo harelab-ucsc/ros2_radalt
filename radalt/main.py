@@ -62,7 +62,7 @@ def talker():
         if ret[0]:
             msg.header.stamp = node.get_clock().now().to_msg()
             msg.header.frame_id = 'radalt'
-            msg.altitude = float(ret[1]/100)
+            msg.altitude = float(ret[1] / 100)
             msg.snr = int(ret[2])
             pub.publish(msg)
     thread.join()

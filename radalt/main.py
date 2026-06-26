@@ -1,6 +1,7 @@
 import rclpy
 import serial
 from custom_msgs.msg import AltSNR
+from copy import deepcopy
 import threading
 import numpy as np
 

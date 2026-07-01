@@ -1,7 +1,6 @@
 import rclpy
 import serial
 from custom_msgs.msg import AltSNR
-from copy import deepcopy
 import threading
 import numpy as np
 
@@ -15,27 +14,24 @@ SIZE = 5  # bytes after head
 
 
 def decodePacket(packet, node):
-    check = 0x00
-    for item in packet[:-1]:
-        check += item
-    check &= 0xFF
+    check = sum(packet[:-1]) & 0xFF
     if check == packet[-1]:
         # alt = ((np.uint16(packet[2]) << 8) + np.uint16(packet[1])).astype(np.uint16)
         alt = ((np.uint16(packet[2]) << 8) + np.uint16(packet[1]))
         snr = np.uint8(packet[-2])
         if snr > 13:
-            return (1, alt, snr)
+            return alt, snr
         else:
             error_msg = (
                 'altimeter SNR below manufacturer-defined minimum '
                 'threshold (13dB); packet dumped'
             )
             node.get_logger().info(error_msg)
-            return (0,)
+            return None
     else:
         error_msg = 'decoding checksum failed; packet dumped'
         node.get_logger().info(error_msg)
-        return (0,)
+        return None
 
 
 def talker():
@@ -59,12 +55,12 @@ def talker():
         packet = np.frombuffer(val, dtype=np.uint8)
 
         ret = decodePacket(packet, node)
-        msg = AltSNR()
-        if ret[0]:
+        if ret is not None:
+            msg = AltSNR()
             msg.header.stamp = node.get_clock().now().to_msg()
             msg.header.frame_id = 'radalt'
-            msg.altitude = float(ret[1] / 100)
-            msg.snr = int(ret[2])
+            msg.altitude = float(ret[0] / 100)
+            msg.snr = int(ret[1])
             pub.publish(msg)
     thread.join()
 
@@ -74,6 +70,10 @@ def main():
         talker()
     except KeyboardInterrupt:
         pass
+    finally:
+        device.close()
+        node.destroy_node()
+        rclpy.shutdown()
 
 
 if __name__ == '__main__':

@@ -1,6 +1,6 @@
 import rclpy
 import serial
-from custom_msgs.msg import AltSNR
+from ros2_radalt_msgs.msg import AltSNR
 import threading
 import numpy as np
 

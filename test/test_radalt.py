@@ -5,6 +5,7 @@ decodePacket tests are pure-Python (numpy only) — no ROS 2 runtime needed.
 Serial-loop tests mock rclpy + serial to verify that read_until() is used
 instead of the old byte-by-byte busy-poll that consumed 100 % CPU.
 """
+
 import sys
 import types
 import unittest
@@ -47,6 +48,7 @@ from radalt.main import SIZE, decodePacket, talker  # noqa: E402
 #   [4]  checksum = sum(bytes 0–3) & 0xFF
 # ---------------------------------------------------------------------------
 
+
 def _build_packet(alt_cm: int, snr: int, p0: int = 0x00) -> np.ndarray:
     p1 = alt_cm & 0xFF
     p2 = (alt_cm >> 8) & 0xFF
@@ -65,8 +67,8 @@ def _node():
 # decodePacket unit tests
 # ---------------------------------------------------------------------------
 
-class TestDecodePacket(unittest.TestCase):
 
+class TestDecodePacket(unittest.TestCase):
     def test_valid_high_snr(self):
         """Good checksum + SNR > 13 returns (1, altitude_cm, snr)."""
         pkt = _build_packet(1234, 50)
@@ -115,6 +117,7 @@ class TestDecodePacket(unittest.TestCase):
 # Serial-loop behaviour tests
 # ---------------------------------------------------------------------------
 
+
 class TestSerialLoop(unittest.TestCase):
     """
     Verify the refactored talker() loop uses serial.read_until().
@@ -129,11 +132,11 @@ class TestSerialLoop(unittest.TestCase):
             payload = _build_packet(500, 50).tobytes()
 
         mock_device = MagicMock()
-        mock_device.read_until.return_value = b'\xfe'
+        mock_device.read_until.return_value = b"\xfe"
         mock_device.read.return_value = payload
 
         mock_node = MagicMock()
-        mock_node.declare_parameter.return_value.value = '/dev/null'
+        mock_node.declare_parameter.return_value.value = "/dev/null"
 
         # rclpy.ok() allows exactly one loop iteration then exits
         _count = [0]
@@ -142,10 +145,11 @@ class TestSerialLoop(unittest.TestCase):
             _count[0] += 1
             return _count[0] <= 1
 
-        with patch("radalt.main.rclpy") as mock_rclpy, \
-                patch("radalt.main.serial.Serial", return_value=mock_device), \
-                patch("radalt.main.threading.Thread") as mock_thread:
-
+        with (
+            patch("radalt.main.rclpy") as mock_rclpy,
+            patch("radalt.main.serial.Serial", return_value=mock_device),
+            patch("radalt.main.threading.Thread") as mock_thread,
+        ):
             mock_rclpy.ok.side_effect = _ok
             mock_rclpy.create_node.return_value = mock_node
             mock_thread.return_value.join = MagicMock()
@@ -157,14 +161,15 @@ class TestSerialLoop(unittest.TestCase):
     def test_read_until_called_with_sync_byte(self):
         r"""Loop must call read_until(b'\xfe') to locate each packet start."""
         device = self._run_one_cycle()
-        device.read_until.assert_called_with(b'\xfe')
+        device.read_until.assert_called_with(b"\xfe")
 
     def test_no_bare_single_byte_read(self):
         """No bare read() call — that was the busy-spin pattern."""
         device = self._run_one_cycle()
         for c in device.read.call_args_list:
             self.assertNotEqual(
-                c, call(),
+                c,
+                call(),
                 "bare read() detected — old busy-spin is still present",
             )
 
@@ -175,18 +180,19 @@ class TestSerialLoop(unittest.TestCase):
 
     def test_short_read_skips_decode(self):
         """A truncated payload (len < SIZE) must not reach decodePacket."""
-        with patch("radalt.main.rclpy") as mock_rclpy, \
-                patch("radalt.main.serial.Serial") as mock_serial_cls, \
-                patch("radalt.main.threading.Thread"), \
-                patch("radalt.main.decodePacket") as mock_decode:
-
+        with (
+            patch("radalt.main.rclpy") as mock_rclpy,
+            patch("radalt.main.serial.Serial") as mock_serial_cls,
+            patch("radalt.main.threading.Thread"),
+            patch("radalt.main.decodePacket") as mock_decode,
+        ):
             mock_device = MagicMock()
-            mock_device.read_until.return_value = b'\xfe'
-            mock_device.read.return_value = b'\x00\x01'  # only 2 bytes
+            mock_device.read_until.return_value = b"\xfe"
+            mock_device.read.return_value = b"\x00\x01"  # only 2 bytes
             mock_serial_cls.return_value = mock_device
 
             mock_node = MagicMock()
-            mock_node.declare_parameter.return_value.value = '/dev/null'
+            mock_node.declare_parameter.return_value.value = "/dev/null"
 
             _count = [0]
 

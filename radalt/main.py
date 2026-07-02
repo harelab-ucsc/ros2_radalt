@@ -17,38 +17,38 @@ def decodePacket(packet, node):
     check = sum(packet[:-1]) & 0xFF
     if check == packet[-1]:
         # alt = ((np.uint16(packet[2]) << 8) + np.uint16(packet[1])).astype(np.uint16)
-        alt = ((np.uint16(packet[2]) << 8) + np.uint16(packet[1]))
+        alt = (np.uint16(packet[2]) << 8) + np.uint16(packet[1])
         snr = np.uint8(packet[-2])
         if snr > 13:
             return alt, snr
         else:
             error_msg = (
-                'altimeter SNR below manufacturer-defined minimum '
-                'threshold (13dB); packet dumped'
+                "altimeter SNR below manufacturer-defined minimum "
+                "threshold (13dB); packet dumped"
             )
             node.get_logger().info(error_msg)
             return None
     else:
-        error_msg = 'decoding checksum failed; packet dumped'
+        error_msg = "decoding checksum failed; packet dumped"
         node.get_logger().info(error_msg)
         return None
 
 
 def talker():
     rclpy.init()
-    node = rclpy.create_node('alt_pub')
+    node = rclpy.create_node("alt_pub")
     # super().__init__('alt_pub')
-    pub = node.create_publisher(AltSNR, 'rad_altitude', 10)
-    port = node.declare_parameter('port', '/dev/devRADALT').value
+    pub = node.create_publisher(AltSNR, "rad_altitude", 10)
+    port = node.declare_parameter("port", "/dev/devRADALT").value
     # assert isinstance(port, str)
     device = serial.Serial(port=port, baudrate=115200, timeout=1.0)
 
-    thread = threading.Thread(target=rclpy.spin, args=(node, ), daemon=True)
+    thread = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
     thread.start()
 
     while rclpy.ok():
         # Block until sync byte — no busy-spin on non-header bytes
-        device.read_until(b'\xfe')
+        device.read_until(b"\xfe")
         val = device.read(SIZE)
         if len(val) < SIZE:
             continue
@@ -58,7 +58,7 @@ def talker():
         if ret is not None:
             msg = AltSNR()
             msg.header.stamp = node.get_clock().now().to_msg()
-            msg.header.frame_id = 'radalt'
+            msg.header.frame_id = "radalt"
             msg.altitude = float(ret[0] / 100)
             msg.snr = int(ret[1])
             pub.publish(msg)
@@ -76,5 +76,5 @@ def main():
         rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

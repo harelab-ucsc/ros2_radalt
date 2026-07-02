@@ -1,77 +1,156 @@
+import time
+
 import rclpy
+from rclpy.node import Node
 import serial
+
 from ros2_radalt_msgs.msg import AltSNR
-import threading
-import numpy as np
 
-SIZE = 5  # bytes after head
-
-# Steve says make a custom message to hold 2 named items: altitude, m (float) and SNR (UInt8)
-# create blank msg to populate instead of the zeros list + deepcopies
-# next interpret the msg as a struct (builtin package)
-# sensor is format string '>H'
-# convert int from tuple to float through conversion to meters, stuff into msg
+SYNC = 0xFE
+PAYLOAD_SIZE = 5
 
 
-def decodePacket(packet, node):
-    check = sum(packet[:-1]) & 0xFF
-    if check == packet[-1]:
-        # alt = ((np.uint16(packet[2]) << 8) + np.uint16(packet[1])).astype(np.uint16)
-        alt = (np.uint16(packet[2]) << 8) + np.uint16(packet[1])
-        snr = np.uint8(packet[-2])
-        if snr > 13:
-            return alt, snr
-        else:
-            error_msg = (
-                "altimeter SNR below manufacturer-defined minimum "
-                "threshold (13dB); packet dumped"
-            )
-            node.get_logger().info(error_msg)
+class RadAltNode(Node):
+
+    def __init__(self):
+        super().__init__("radalt")
+
+        self.publisher = self.create_publisher(
+            AltSNR,
+            "rad_altitude",
+            10,
+        )
+
+        self.port = self.declare_parameter(
+            "port",
+            "/dev/devRADALT",
+        ).value
+
+        self.device = None
+
+    def connect(self):
+        while rclpy.ok():
+            try:
+                self.get_logger().info(f"Opening {self.port}")
+
+                self.device = serial.Serial(
+                    port=self.port,
+                    baudrate=115200,
+                    timeout=1.0,
+                )
+
+                self.reset_input_buffer()
+
+                self.get_logger().info("Connected.")
+                return
+
+            except serial.SerialException as e:
+                self.get_logger().error(f"Failed to open serial port: {e}")
+                time.sleep(1.0)
+
+    def reset_input_buffer(self):
+        try:
+            self.device.reset_input_buffer()
+        except Exception:
+            pass
+
+    def read_packet(self):
+
+        #
+        # Wait for sync byte.
+        #
+        while rclpy.ok():
+
+            b = self.device.read(1)
+
+            if len(b) == 0:
+                continue
+
+            if b[0] == SYNC:
+                break
+
+        payload = self.device.read(PAYLOAD_SIZE)
+
+        if len(payload) != PAYLOAD_SIZE:
             return None
-    else:
-        error_msg = "decoding checksum failed; packet dumped"
-        node.get_logger().info(error_msg)
-        return None
 
+        return payload
 
-def talker():
-    rclpy.init()
-    node = rclpy.create_node("alt_pub")
-    # super().__init__('alt_pub')
-    pub = node.create_publisher(AltSNR, "rad_altitude", 10)
-    port = node.declare_parameter("port", "/dev/devRADALT").value
-    # assert isinstance(port, str)
-    device = serial.Serial(port=port, baudrate=115200, timeout=1.0)
+    def decode(self, payload):
 
-    thread = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
-    thread.start()
+        checksum = sum(payload[:-1]) & 0xFF
 
-    while rclpy.ok():
-        # Block until sync byte — no busy-spin on non-header bytes
-        device.read_until(b"\xfe")
-        val = device.read(SIZE)
-        if len(val) < SIZE:
-            continue
-        packet = np.frombuffer(val, dtype=np.uint8)
+        if checksum != payload[4]:
+            self.get_logger().warn("Checksum failure.")
+            return None
 
-        ret = decodePacket(packet, node)
-        if ret is not None:
-            msg = AltSNR()
-            msg.header.stamp = node.get_clock().now().to_msg()
-            msg.header.frame_id = "radalt"
-            msg.altitude = float(ret[0] / 100)
-            msg.snr = int(ret[1])
-            pub.publish(msg)
-    thread.join()
+        altitude_cm = payload[1] | (payload[2] << 8)
+        snr = payload[3]
+
+        if snr <= 13:
+            return None
+
+        return altitude_cm / 100.0, snr
+
+    def run(self):
+
+        self.connect()
+
+        while rclpy.ok():
+
+            try:
+
+                payload = self.read_packet()
+
+                if payload is None:
+                    continue
+
+                decoded = self.decode(payload)
+
+                if decoded is None:
+                    continue
+
+                altitude, snr = decoded
+
+                msg = AltSNR()
+
+                msg.header.stamp = self.get_clock().now().to_msg()
+                msg.header.frame_id = "radalt"
+
+                msg.altitude = altitude
+                msg.snr = snr
+
+                self.publisher.publish(msg)
+
+            except serial.SerialException as e:
+
+                self.get_logger().error(f"Serial error: {e}")
+
+                try:
+                    self.device.close()
+                except Exception:
+                    pass
+
+                time.sleep(1.0)
+                self.connect()
+
+        if self.device is not None:
+            self.device.close()
 
 
 def main():
+
+    rclpy.init()
+
+    node = RadAltNode()
+
     try:
-        talker()
+        node.run()
+
     except KeyboardInterrupt:
         pass
+
     finally:
-        device.close()
         node.destroy_node()
         rclpy.shutdown()
 

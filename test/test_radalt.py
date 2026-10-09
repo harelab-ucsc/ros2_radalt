@@ -14,14 +14,14 @@ from unittest.mock import MagicMock, call, patch
 import numpy as np
 
 # ---------------------------------------------------------------------------
-# Shim custom_msgs so the module loads in environments where the workspace
+# Shim ros2_radalt_msgs so the module loads in environments where the workspace
 # hasn't been built yet (e.g. local dev without colcon build).  In Docker
 # after `colcon build + source install/setup.sh` the real package is present
 # and setdefault is a no-op.
 # ---------------------------------------------------------------------------
-if "custom_msgs" not in sys.modules:
-    _cm = types.ModuleType("custom_msgs")
-    _cm_msg = types.ModuleType("custom_msgs.msg")
+if "ros2_radalt_msgs" not in sys.modules:
+    _cm = types.ModuleType("ros2_radalt_msgs")
+    _cm_msg = types.ModuleType("ros2_radalt_msgs.msg")
 
     class _AltSNRShim:
         def __init__(self):
@@ -31,8 +31,8 @@ if "custom_msgs" not in sys.modules:
 
     _cm_msg.AltSNR = _AltSNRShim
     _cm.msg = _cm_msg
-    sys.modules["custom_msgs"] = _cm
-    sys.modules["custom_msgs.msg"] = _cm_msg
+    sys.modules["ros2_radalt_msgs"] = _cm
+    sys.modules["ros2_radalt_msgs.msg"] = _cm_msg
 
 from radalt.main import SIZE, decodePacket, talker  # noqa: E402
 
